@@ -1,0 +1,220 @@
+# ------------------
+# General Settings
+# ------------------
+verbose: false
+random_seed: 42
+root: #set in main.py as root of QGRN
+
+# ------------------
+# Preprocessing
+# ------------------
+
+#input data location
+data: 
+  mode: single_run #(<single_run>, multi_run)
+  single_run: #hardcoded input
+    active_dataset: 200g #200g, 500g, 200g_mod, 500g_mod, 200g_mod2, 500g_mod2, custom
+  multi_run: #input any directory with any number of subdirectories containing necessary files in correct format
+    prepared: False #if True, dataset is already preprocessed and ready for annealer, if False, dataset needs to be preprocessed before annealer
+    source: SERGIO100 #(<DREAM5>, BEELINE-Curated, BEELINE-Synthetic, DREAM4-Multifactorial, SERGIO100, custom)
+
+  #hardcoded datasets
+  #arbitrary datasets can be injected into config parser during execution
+  datasets:
+    200g:
+      source: GRouNdGAN
+      genes_in_rows: False
+      scRNA: QGRN/data/simulated/GRouNdGAN/PBMC/simulated_200g_10k.h5ad
+      tfs: QGRN/data/simulated/GRouNdGAN/PBMC/Homo_sapiens_TF.json #TFs=genes if empty
+      GT_GRN: QGRN/data/simulated/GRouNdGAN/PBMC/causal_graph_200g.pkl
+      genes: QGRN/data/simulated/GRouNdGAN/PBMC/genes_idx_200g.json
+    500g:
+      source: GRouNdGAN
+      genes_in_rows: False
+      scRNA: QGRN/data/simulated/GRouNdGAN/PBMC/simulated_500g_10k.h5ad
+      tfs: QGRN/data/simulated/GRouNdGAN/PBMC/Homo_sapiens_TF.json #TFs=genes if empty
+      GT_GRN: QGRN/data/simulated/GRouNdGAN/PBMC/causal_graph_500g.pkl
+      genes: QGRN/data/simulated/GRouNdGAN/PBMC/genes_idx_500g.json
+    200g_mod:
+      source: GRouNdGAN
+      genes_in_rows: False
+      scRNA: QGRN/data/simulated/GRouNdGAN/PBMC/simulated_mod_200g_10k.h5ad
+      tfs: QGRN/data/simulated/GRouNdGAN/PBMC/Homo_sapiens_TF.json #TFs=genes if empty
+      GT_GRN: QGRN/data/simulated/GRouNdGAN/PBMC/causal_graph_mod_200g.pkl
+      genes: QGRN/data/simulated/GRouNdGAN/PBMC/genes_idx_mod_200g.json
+    500g_mod:
+      source: GRouNdGAN
+      genes_in_rows: False
+      scRNA: QGRN/data/simulated/GRouNdGAN/PBMC/simulated_mod_500g_10k.h5ad
+      tfs: QGRN/data/simulated/GRouNdGAN/PBMC/Homo_sapiens_TF.json #TFs=genes if empty
+      GT_GRN: QGRN/data/simulated/GRouNdGAN/PBMC/causal_graph_mod_500g.pkl
+      genes: QGRN/data/simulated/GRouNdGAN/PBMC/genes_idx_mod_500g.json
+    200g_mod2:
+      source: GRouNdGAN
+      genes_in_rows: False
+      scRNA: QGRN/data/simulated/GRouNdGAN/PBMC/simulated_mod2_200g_10k.h5ad
+      tfs: QGRN/data/simulated/GRouNdGAN/PBMC/Homo_sapiens_TF.json #TFs=genes if empty
+      GT_GRN: QGRN/data/simulated/GRouNdGAN/PBMC/causal_graph_mod2_200g.pkl
+      genes: QGRN/data/simulated/GRouNdGAN/PBMC/genes_idx_mod2_200g.json
+    500g_mod2:
+      source: GRouNdGAN
+      genes_in_rows: False
+      scRNA: QGRN/data/simulated/GRouNdGAN/PBMC/simulated_mod2_500g_10k.h5ad
+      tfs: QGRN/data/simulated/GRouNdGAN/PBMC/Homo_sapiens_TF.json #TFs=genes if empty
+      GT_GRN: QGRN/data/simulated/GRouNdGAN/PBMC/causal_graph_mod2_500g.pkl
+      genes: QGRN/data/simulated/GRouNdGAN/PBMC/genes_idx_mod2_500g.json
+    DREAM5-1:
+      source: DREAM5
+      genes_in_rows: False
+      scRNA: QGRN/data/prepared/DREAM5/Network1/expression
+      tfs: QGRN/data/prepared/DREAM5/Network1/tfs.json #TFs=genes if empty
+      GT_GRN: QGRN/data/prepared/DREAM5/Network1/GT_GRN.csv
+      genes: QGRN/data/prepared/DREAM5/Network1/genes.json
+    SERGIO100-static:
+      source: SERGIO100
+      genes_in_rows: True
+      scRNA: QGRN/data/prepared/SERGIO100/De-noised_100G_9T_300cPerT_4_DS1/scRNA.tsv
+      tfs: QGRN/data/prepared/SERGIO100/De-noised_100G_9T_300cPerT_4_DS1/tfs.json #TFs=genes if empty
+      GT_GRN: QGRN/data/prepared/SERGIO100/De-noised_100G_9T_300cPerT_4_DS1/GT_GRN.csv
+      genes: QGRN/data/prepared/SERGIO100/De-noised_100G_9T_300cPerT_4_DS1/genes.json
+# -----------------------------
+# Scores (only one should be selected)
+# -----------------------------
+scores:
+  conditional:
+    mode: #(<null>, combined, activation, inhibition) #TODO: add grnboost2 once implement
+    normalization: global-min-max #(null, gene-wise-min-max, <global-min-max>)
+    bias_correction: True #(<True>, False)
+  grnboost2:
+    mode: True #(True, <False>)
+  genie3:
+    mode: False #(True, <False>)
+  mutual_information:
+    mode: False #(True, <False>)
+  pearson:
+    mode: False #(True, <False>)
+  spearman:
+    mode: True #(True, <False>)
+  pidc:
+    mode: False
+  ppcor:
+    mode: False
+    pval_threshold: 1
+  
+# -----------------------------
+# Graph Topological Constraints
+# -----------------------------
+constraints:
+  sparsity:
+    mode: #(<True>, False)
+    penalty: 0.1 #0 < <0.1> < ∞)
+
+  reflexive_edges:
+    mode: True #(<True>, False)
+    penalty: 1 #0 < <1> < ∞)
+
+  two_cycles:
+    mode: #(True, <False>)
+    penalty: 1 #0 < <1> < ∞)
+
+  pruning:
+    mode: #(True, <False>)
+    threshold: #0 < <0.1> < ∞)
+
+  in_degree:
+    mode: range #(<null>, exact, range)
+    #exact
+    target_exact: 5 #0 < <5> < ∞)
+    penalty: 0.01 #0 < <0.1> < ∞)
+
+    #range
+    target_range: [1, 4] #min: 0 TODO: change to n once min is implemented, max: 0 < <1> < ∞)
+    min_penalty: 0.01
+    max_penalty: 0.01
+
+  out_degree:
+    mode: distribution #(<null>, exact, range, distribution)
+    #exact
+    target_exact: 5 #0 < <5> < ∞)
+    penalty: 0.1 #0 < <0.1> < ∞)
+
+    #range
+    target_range: [3, 20] #min: 0 TODO: change to n once min is implemented, max: 0 < <1> < ∞)
+    min_penalty: 0.01
+    max_penalty: 0.01
+
+    #distribution
+    alpha: 1.5
+    kc: 15
+    kmin: 1 #<1> must be >=1 to avoid zero division error in power law distribution
+    kmax: 16
+    one_hot_penalty: 1
+    global_penalty: 0.001
+    linking_penalty: 0.001
+    max_overlay_penalty: 0.0 #if >0 additionally add out_degree range penalty.
+
+# ------------------
+# Annealing
+# ------------------
+annealer:
+  mode: SQA #(<SA>, SQA)
+  num_reads: 100 #0 < <1000> < ∞
+  num_cores: 100 #<null> (automatically maximizes cores), n
+
+# ------------------
+# Comparison with other methods
+# ------------------
+
+base_lines:
+  random: 
+    mode: True #(<True>, False)
+    limit: null  #(n_GT_edges, n_annealer_edges, <null>) number of top edges to select for evaluation
+
+  self: 
+    mode: True #(<True>, False)
+    limit: null  #(n_GT_edges, n_annealer_edges, <null>) number of top edges to select for evaluation
+  
+  grnboost2: 
+    mode: False #(<True>, False)
+    limit: n_GT_edges #(n_GT_edges, n_annealer_edges, <null>) number of top edges to select for evaluation
+
+  genie3:
+    mode: False #(<True>, False)  
+    limit: n_GT_edges #(n_GT_edges, n_annealer_edges, <null>) number of top edges to select for evaluation
+
+  ppcor:
+    mode: False #(<True>, False)  
+    limit: n_GT_edges #(<n_GT_edges>, n_annealer_edges, <null>) number of top edges to select for evaluation
+
+  pidc:
+    mode: False #(<True>, False)  
+    limit: n_GT_edges #(<n_GT_edges>, n_annealer_edges, <null>) number of top edges to select for evaluation
+
+evaluation:
+  binary_classification:
+    mode: False #(<True>, False)
+    metrics:
+      precision: #(<True>, False)
+      recall: #(<True>, False)
+      f1_score: #(<True>, False)
+      jaccard: #(<True>, False)
+      TP: #(<True>, False)
+      FP: #(<True>, False)
+      TN: #(<True>, False)
+      FN: #(<True>, False)
+      mcc: #(<True>, False)
+      npred_edges: #(<True>, False)
+      pred_density: #(<True>, False)
+  confidence_evaluation:
+    mode: True #(<True>, False)
+    lambda_scores: 0.2 #0 < <0.5> < 1)
+    lambda_robustness: 0.6 #0 < <0.5> < 1)
+    lambda_energy: 0.2 #0 < <0.5> < 1)
+    metrics:
+      auprc: #(<True>, False)
+      auroc: #(<True>, False)
+
+outputs:
+  save_inference_grns:
+    mode: True #(<True>, False)
+    path: QGRN/Testing/plotting/results/saved_grns
