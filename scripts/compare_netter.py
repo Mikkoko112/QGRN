@@ -183,8 +183,14 @@ def run_qgrn(config_path: Path, output_dir: Path, verbose: bool) -> None:
     if verbose:
         command.append("-v")
 
+    # Prefer this checkout over a different installed package named QGRN.
+    qgrn_env = os.environ.copy()
+    existing_pythonpath = qgrn_env.get("PYTHONPATH")
+    qgrn_env["PYTHONPATH"] = os.pathsep.join(
+        path for path in (str(QGRN_ROOT), existing_pythonpath) if path
+    )
     try:
-        subprocess.run(command, cwd=QGRN_ROOT, check=True)
+        subprocess.run(command, cwd=QGRN_ROOT, check=True, env=qgrn_env)
     finally:
         temporary_config.unlink(missing_ok=True)
 

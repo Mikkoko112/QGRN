@@ -105,7 +105,14 @@ def create_config(example_config: Path, dataset: str, dataset_info: dict, path: 
 
 
 def run(command: list[str], verbose: bool) -> None:
-    subprocess.run(command, cwd=QGRN_ROOT, check=True, capture_output=not verbose)
+    try:
+        subprocess.run(command, cwd=QGRN_ROOT, check=True, capture_output=not verbose)
+    except subprocess.CalledProcessError as error:
+        if error.stdout:
+            print(error.stdout, file=sys.stdout, end="")
+        if error.stderr:
+            print(error.stderr, file=sys.stderr, end="")
+        raise
 
 
 def collect_summary(experiment_dir: Path, dataset: str, iterations: int) -> pd.DataFrame:
