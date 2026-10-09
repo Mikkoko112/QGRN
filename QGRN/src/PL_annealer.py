@@ -14,7 +14,7 @@ def execute_annealer(config_parser : ConfigParser, run_name, dataset_info):
     root_path = Path(config_parser.get_value("root_path")) #gets set in main.py
     active_dataset = run_name
 
-    required_dataset_fields = ["scRNA", "tfs", "GT_GRN", "genes", "genes_in_rows", "source"]
+    required_dataset_fields = ["scRNA", "tfs", "genes", "genes_in_rows", "source"]
     missing_fields = [
         field for field in required_dataset_fields
         if field not in dataset_info
@@ -27,11 +27,32 @@ def execute_annealer(config_parser : ConfigParser, run_name, dataset_info):
 
     scRNA_data_path = root_path / Path(dataset_info["scRNA"])
     transcription_factors_path = root_path / Path(dataset_info["tfs"])
-    ground_truth_grn_path = root_path / Path(dataset_info["GT_GRN"])
     ordered_genes_path = root_path / Path(dataset_info["genes"])
     genes_in_rows = dataset_info.get("genes_in_rows")
     data_source = dataset_info.get("source")
-    df_ref_grn = csv_to_df_grn(ground_truth_grn_path)
+    ground_truth_grn_path = None
+    df_ref_grn = None
+    if dataset_info.get("GT_GRN"):
+        ground_truth_grn_path = root_path / Path(dataset_info["GT_GRN"])
+        if ground_truth_grn_path.exists():
+            df_ref_grn = csv_to_df_grn(ground_truth_grn_path)
+
+    ground_truth_config = config_parser.get_features().get("ground_truth", {})
+    ground_truth_required = ground_truth_config.get("required", True)
+    edge_budget = ground_truth_config.get("edge_budget")
+    if df_ref_grn is None and ground_truth_required:
+        raise ValueError(
+            f"dataset: {active_dataset} has no usable GT_GRN, but "
+            "ground_truth.required is true"
+        )
+    if df_ref_grn is None and edge_budget is None:
+        raise ValueError(
+            f"dataset: {active_dataset} has no GT_GRN. Set "
+            "ground_truth.required: false and provide ground_truth.edge_budget."
+        )
+    if edge_budget is not None:
+        if not isinstance(edge_budget, int) or edge_budget <= 0:
+            raise ValueError("ground_truth.edge_budget must be a positive integer or null")
     df_raw = csv_to_df_scRNA(scRNA_data_path, genes_in_rows=genes_in_rows)
 
     #extract gene and tf information
@@ -80,7 +101,23 @@ def execute_annealer(config_parser : ConfigParser, run_name, dataset_info):
                                         verbose=VERBOSE)
     annealer = Annealer(verbose=VERBOSE)
 
-    ntopedges = df_ref_grn.shape[0]
+    ntopedges = df_ref_grn.shape[0] if df_ref_grn is not None else None
+    evaluation_edge_budget = edge_budget if edge_budget is not None else ntopedges
+
+    def resolve_limit(limit_mode):
+        if limit_mode is None:
+            return ntfs * ngenes
+        if isinstance(limit_mode, int):
+            return limit_mode
+        if limit_mode == "n_GT_edges":
+            if evaluation_edge_budget is None:
+                raise ValueError(
+                    "n_GT_edges was requested but no GT_GRN or edge budget is available"
+                )
+            return evaluation_edge_budget
+        if limit_mode == "n_annealer_edges":
+            return nprededges
+        raise ValueError(f"limit_mode: '{limit_mode}' is not valid")
     inference_dataframes = dict()
 
     #SCORES
@@ -234,46 +271,19 @@ def execute_annealer(config_parser : ConfigParser, run_name, dataset_info):
     nprededges = inference_dataframes["annealer"].shape[0]
     if config_parser.get_value("base_lines.random.mode", default=True):
         limit_mode = config_parser.get_value("base_lines.random.limit")
-        if limit_mode == None:
-            limit = ntfs * ngenes
-        elif limit_mode == "n_GT_edges":
-            limit = ntopedges
-        elif limit_mode == "n_annealer_edges":
-            limit = nprededges
-        else:
-            raise ValueError(
-                f"limit_mode: '{limit_mode}' is not valid"
-            )
+        limit = resolve_limit(limit_mode)
         df_random = create_random_grn(genes, tfs, limit)
         inference_dataframes["random"] = df_random
 
     if config_parser.get_value("base_lines.self.mode", default=True):
         limit_mode = config_parser.get_value("base_lines.self.limit")
-        if limit_mode == None:
-            limit = ntfs * ngenes
-        elif limit_mode == "n_GT_edges":
-            limit = ntopedges
-        elif limit_mode == "n_annealer_edges":
-            limit = nprededges
-        else:
-            raise ValueError(
-                f"limit_mode: '{limit_mode}' is not valid"
-            )
+        limit = resolve_limit(limit_mode)
         inference_dataframes["self"] = scores.get_confidence_df().sort_values(by="regulator.effect", ascending=False).head(limit) 
 
     if config_parser.get_value("base_lines.grnboost2.mode", default=True):
         from QGRN.src.baselines import baseline_GRNBoost2
         limit_mode = config_parser.get_value("base_lines.grnboost2.limit")
-        if limit_mode == None:
-            limit = ntfs * ngenes
-        elif limit_mode == "n_GT_edges":
-            limit = ntopedges
-        elif limit_mode == "n_annealer_edges":
-            limit = nprededges
-        else:
-            raise ValueError(
-                f"limit_mode: '{limit_mode}' is not valid"
-            )
+        limit = resolve_limit(limit_mode)
         inference_dataframes["grnboost2"] = baseline_GRNBoost2(
             df_raw=df_raw,
             genes=genes,
@@ -285,16 +295,7 @@ def execute_annealer(config_parser : ConfigParser, run_name, dataset_info):
     if config_parser.get_value("base_lines.genie3.mode", default=False):
         from QGRN.src.baselines import baseline_GENIE3
         limit_mode = config_parser.get_value("base_lines.genie3.limit")
-        if limit_mode == None:
-            limit = ntfs * ngenes
-        elif limit_mode == "n_GT_edges":
-            limit = ntopedges
-        elif limit_mode == "n_annealer_edges":
-            limit = nprededges
-        else:
-            raise ValueError(
-                f"limit_mode: '{limit_mode}' is not valid"
-            )
+        limit = resolve_limit(limit_mode)
         inference_dataframes["genie3"] = baseline_GENIE3(
             df_raw=df_raw,
             genes=genes,
@@ -309,7 +310,7 @@ def execute_annealer(config_parser : ConfigParser, run_name, dataset_info):
     
     evaluation_results = {"binary_classification":pd.DataFrame(), 
                           "confidence_evaluation":pd.DataFrame()}
-    if config_parser.get_value("evaluation.binary_classification.mode", default=True):
+    if df_ref_grn is not None and config_parser.get_value("evaluation.binary_classification.mode", default=True):
         binary_metrics = list()
         possible_metrics = config_parser.get_value("evaluation.binary_classification.metrics", default={}).keys()
         for metric in possible_metrics:
@@ -347,34 +348,35 @@ def execute_annealer(config_parser : ConfigParser, run_name, dataset_info):
         print("Annealer confidence scores calculated.") if VERBOSE else None
         inference_dataframes["annealer"] = annealer_confidence_df
 
-        #get selected metrics for confidence evaluation
-        confidence_metrics = list()
-        possible_metrics = config_parser.get_value("evaluation.confidence_evaluation.metrics", default={}).keys()
-        for metric in possible_metrics:
-            if config_parser.get_value(f"evaluation.confidence_evaluation.metrics.{metric}", default=True):
-                confidence_metrics.append(metric)
-                
-        if len(confidence_metrics) == 0:
-            raise ValueError("At least one evaluation metric must be selected in the configuration.")
+        if df_ref_grn is not None:
+            #get selected metrics for confidence evaluation
+            confidence_metrics = list()
+            possible_metrics = config_parser.get_value("evaluation.confidence_evaluation.metrics", default={}).keys()
+            for metric in possible_metrics:
+                if config_parser.get_value(f"evaluation.confidence_evaluation.metrics.{metric}", default=True):
+                    confidence_metrics.append(metric)
 
-        #calculate confidence evaluation metrics for all inference dataframes (including annealer and baselines)
-        confidence_rows = {}
-        for inference_name, df_inference in inference_dataframes.items():
-            results = calculate_ap_auprc(
-                inferred_df=df_inference,
-                ground_truth_df=df_ref_grn,
-                tf_list=tfs,
-                gene_list=genes
+            if len(confidence_metrics) == 0:
+                raise ValueError("At least one evaluation metric must be selected in the configuration.")
+
+            #calculate confidence evaluation metrics for all inference dataframes (including annealer and baselines)
+            confidence_rows = {}
+            for inference_name, df_inference in inference_dataframes.items():
+                results = calculate_ap_auprc(
+                    inferred_df=df_inference,
+                    ground_truth_df=df_ref_grn,
+                    tf_list=tfs,
+                    gene_list=genes
+                )
+                confidence_rows[inference_name] = {
+                    metric: results[metric] for metric in possible_metrics
+                }
+
+            confidence_evaluation_results = pd.DataFrame.from_dict(
+                confidence_rows,
+                orient="index",
             )
-            confidence_rows[inference_name] = {
-                metric: results[metric] for metric in possible_metrics
-            }
-
-        confidence_evaluation_results = pd.DataFrame.from_dict(
-            confidence_rows,
-            orient="index",
-        )
-        evaluation_results["confidence_evaluation"] = confidence_evaluation_results
+            evaluation_results["confidence_evaluation"] = confidence_evaluation_results
 
     if config_parser.get_value("outputs.save_inference_grns.mode", default=False):
         save_path = root_path / Path(
@@ -386,7 +388,8 @@ def execute_annealer(config_parser : ConfigParser, run_name, dataset_info):
         dataset_dir = save_path / active_dataset
         dataset_dir.mkdir(parents=True, exist_ok=True)
 
-        df_ref_grn.to_csv(dataset_dir / "ground_truth.csv", index=False)
+        if df_ref_grn is not None:
+            df_ref_grn.to_csv(dataset_dir / "ground_truth.csv", index=False)
 
         for method_name, df_inference in inference_dataframes.items():
             df_inference.to_csv(dataset_dir / f"{method_name}.csv", index=False)

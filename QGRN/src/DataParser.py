@@ -54,6 +54,7 @@ class DataParser():
                 "BEELINE-Curated": self.BEELINE_curated_preprocess,
                 "BEELINE-Synthetic": self.BEELINE_synthetic_preprocess,
                 "SERGIO100": self.SERGIO100_preprocess,
+                "Norman2019": self.Norman2019_preprocess,
             }
 
             if not prepared:
@@ -402,4 +403,86 @@ class DataParser():
         runs_path = self.root_path / "QGRN" / "data" / "prepared" / source / "runs.json"
         with open(runs_path, "w") as f:
             json.dump(run_paths, f, indent=4)
+
+    def Norman2019_preprocess(self, source):
+        """Prepare the Norman 2019 H5AD data for QGRN.
+
+        The raw file contains numeric H5AD variable identifiers.  QGRN needs
+        gene symbols, so this function uses ``var['gene_name']`` and keeps all
+        human TFs present in the dataset before filling the remaining slots by
+        highly-variable-gene rank.
+        """
+        import anndata
+        import numpy as np
+        import pandas as pd
+
+        raw_path = self.root_path / "QGRN" / "data" / "real" / "norman_2019.h5ad"
+        tf_path = self.root_path / "QGRN" / "data" / "simulated" / "BEELINE-Networks" / "human-tfs.csv"
+        target_dir = self.prepared_root / source / "norman_2019"
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        adata = anndata.read_h5ad(raw_path)
+        if "gene_name" not in adata.var:
+            raise ValueError("Norman H5AD is missing var['gene_name']")
+
+        gene_names = adata.var["gene_name"].astype(str).tolist()
+        if len(set(gene_names)) != len(gene_names):
+            raise ValueError("Norman H5AD contains duplicate gene_name values")
+
+        human_tfs = set(pd.read_csv(tf_path)["TF"].astype(str))
+        tf_genes = [gene for gene in gene_names if gene in human_tfs]
+        target_gene_count = 500
+        if len(tf_genes) > target_gene_count:
+            raise ValueError(
+                f"Norman TF set ({len(tf_genes)}) exceeds the target gene count "
+                f"({target_gene_count})"
+            )
+
+        rank = adata.var["highly_variable_rank"].fillna(np.inf)
+        variance = adata.var["variances_norm"].fillna(-np.inf)
+        ranked_genes = sorted(
+            gene_names,
+            key=lambda gene: (
+                float(rank.loc[adata.var["gene_name"] == gene].iloc[0]),
+                -float(variance.loc[adata.var["gene_name"] == gene].iloc[0]),
+            ),
+        )
+        non_tfs = [gene for gene in ranked_genes if gene not in human_tfs]
+        genes = tf_genes + non_tfs[: target_gene_count - len(tf_genes)]
+
+        gene_to_column = {gene: i for i, gene in enumerate(gene_names)}
+        selected_columns = [gene_to_column[gene] for gene in genes]
+        matrix = adata[:, selected_columns].X
+        if hasattr(matrix, "toarray"):
+            matrix = matrix.toarray()
+        df_scRNA = pd.DataFrame(
+            np.asarray(matrix),
+            index=adata.obs_names.astype(str),
+            columns=genes,
+        )
+
+        target_path_scRNA = target_dir / "scRNA.tsv"
+        target_path_genes = target_dir / "genes.json"
+        target_path_tfs = target_dir / "tfs.json"
+        df_scRNA.to_csv(target_path_scRNA, sep="\t", index=False)
+        with open(target_path_genes, "w") as f:
+            json.dump(genes, f)
+        with open(target_path_tfs, "w") as f:
+            json.dump(tf_genes, f)
+
+        runs_path = self.prepared_root / source / "runs.json"
+        with open(runs_path, "w") as f:
+            json.dump(
+                {
+                    "norman_2019": {
+                        "genes": str(target_path_genes),
+                        "tfs": str(target_path_tfs),
+                        "scRNA": str(target_path_scRNA),
+                        "genes_in_rows": False,
+                        "source": source,
+                    }
+                },
+                f,
+                indent=4,
+            )
         

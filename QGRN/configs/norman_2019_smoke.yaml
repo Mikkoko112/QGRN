@@ -1,0 +1,127 @@
+verbose: true
+random_seed: 42
+root:
+
+data:
+  mode: multi_run
+  single_run:
+    active_dataset: norman_2019
+  multi_run:
+    prepared: false
+    source: Norman2019
+  datasets: {}
+
+ground_truth:
+  required: false
+  edge_budget: 5000
+
+scores:
+  conditional:
+    mode:
+    normalization: global-min-max
+    bias_correction: true
+  grnboost2:
+    mode: false
+  genie3:
+    mode: false
+  mutual_information:
+    mode: false
+  pearson:
+    mode: false
+  spearman:
+    mode: true
+  pidc:
+    mode: false
+  ppcor:
+    mode: false
+    pval_threshold: 1
+
+constraints:
+  sparsity:
+    mode: false
+    penalty: 0.1
+  reflexive_edges:
+    mode: true
+    penalty: 1.0
+  two_cycles:
+    mode: false
+    penalty: 1.0
+  pruning:
+    mode: false
+    threshold:
+  in_degree:
+    mode:
+    target_exact: 5
+    penalty: 0.01
+    target_range: [1, 4]
+    min_penalty: 0.01
+    max_penalty: 0.01
+  out_degree:
+    mode:
+    target_exact: 5
+    penalty: 0.1
+    target_range: [3, 20]
+    min_penalty: 0.01
+    max_penalty: 0.01
+    alpha: 1.5
+    kc: 15
+    kmin: 1
+    kmax: 16
+    one_hot_penalty: 1.0
+    global_penalty: 0.001
+    linking_penalty: 0.001
+    max_overlay_penalty: 0.0
+
+annealer:
+  mode: SA
+  num_reads: 1
+  num_cores: 4
+
+base_lines:
+  random:
+    mode: false
+    limit: n_GT_edges
+  self:
+    mode: true
+    limit: n_GT_edges
+  grnboost2:
+    mode: false
+    limit: n_GT_edges
+  genie3:
+    mode: false
+    limit: n_GT_edges
+  ppcor:
+    mode: false
+    limit: n_GT_edges
+  pidc:
+    mode: false
+    limit: n_GT_edges
+
+evaluation:
+  binary_classification:
+    mode: false
+    metrics:
+      precision:
+      recall:
+      f1_score:
+      jaccard:
+      TP:
+      FP:
+      TN:
+      FN:
+      mcc:
+      npred_edges:
+      pred_density:
+  confidence_evaluation:
+    mode: false
+    lambda_scores: 0.2
+    lambda_robustness: 0.6
+    lambda_energy: 0.2
+    metrics:
+      auprc:
+      auroc:
+
+outputs:
+  save_inference_grns:
+    mode: true
+    path: QGRN/Testing/plotting/results/norman_2019_smoke

@@ -13,10 +13,10 @@ root: #set in main.py as root of QGRN
 data: 
   mode: single_run #(<single_run>, multi_run)
   single_run: #hardcoded input
-    active_dataset: 200g #200g, 500g, 200g_mod, 500g_mod, 200g_mod2, 500g_mod2, custom
+    active_dataset: 200g #200g, 500g, 200g_mod, 500g_mod, 200g_mod2, 500g_mod2, norman_2019, custom
   multi_run: #input any directory with any number of subdirectories containing necessary files in correct format
     prepared: False #if True, dataset is already preprocessed and ready for annealer, if False, dataset needs to be preprocessed before annealer
-    source: SERGIO100 #(<DREAM5>, BEELINE-Curated, BEELINE-Synthetic, DREAM4-Multifactorial, SERGIO100, custom)
+    source: SERGIO100 #(<DREAM5>, BEELINE-Curated, BEELINE-Synthetic, DREAM4-Multifactorial, SERGIO100, Norman2019, custom)
 
   #hardcoded datasets
   #arbitrary datasets can be injected into config parser during execution
@@ -77,6 +77,22 @@ data:
       tfs: QGRN/data/prepared/SERGIO100/De-noised_100G_9T_300cPerT_4_DS1/tfs.json #TFs=genes if empty
       GT_GRN: QGRN/data/prepared/SERGIO100/De-noised_100G_9T_300cPerT_4_DS1/GT_GRN.csv
       genes: QGRN/data/prepared/SERGIO100/De-noised_100G_9T_300cPerT_4_DS1/genes.json
+    norman_2019:
+      source: Norman2019
+      genes_in_rows: False
+      scRNA: QGRN/data/prepared/Norman2019/norman_2019/scRNA.tsv
+      tfs: QGRN/data/prepared/Norman2019/norman_2019/tfs.json
+      genes: QGRN/data/prepared/Norman2019/norman_2019/genes.json
+
+# -----------------------------
+# Ground-truth handling
+# -----------------------------
+# Existing GT-backed runs use the GT edge count when a baseline limit is
+# configured as n_GT_edges. For no-GT runs, set required to false and provide
+# edge_budget. A non-null edge_budget takes precedence over the GT edge count.
+ground_truth:
+  required: true
+  edge_budget: null
 # -----------------------------
 # Scores (only one should be selected)
 # -----------------------------
